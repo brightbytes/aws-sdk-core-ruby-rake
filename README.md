@@ -1,6 +1,7 @@
 # Aws::Sdk::Core::Ruby::Rake
 
-TODO: Write a gem description
+Convenient Rake wrapper on a growing set of AWS API methods. [See](http://docs.aws.amazon.com/sdkforruby/api/frames.html)
+for api details. Built upon the [aws-sdk-core-ruby](https://github.com/aws/aws-sdk-core-ruby)
 
 ## Installation
 

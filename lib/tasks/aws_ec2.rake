@@ -3,7 +3,7 @@ require 'aws-sdk-core'
 namespace :aws do
 
   BasePath = Dir.pwd # the Rakefile
-  
+
   def read_data_file(name)
     begin
       File.readlines(data_path(name))
@@ -11,7 +11,7 @@ namespace :aws do
       []
     end
   end
-  
+
   def data_path(name)
     File.join(BasePath, "data/#{name}.txt")
   end
@@ -20,26 +20,26 @@ namespace :aws do
     f = File.new(path, "w+")
     f.close
   end
-  
+
   namespace :ec2 do
-    
+
     desc "create_security_group"
-    task :create_security_group, [:region] => [:env] do |t, args|
+    task :create_security_group, [:region] => [:region] do |t, args|
       ec2 = Aws::EC2.new
       resp = ec2.create_security_group(
         group_name: "rstudio",
         description: "rstudio",
         )
     end
-    
+
     desc "authorize_security_group_ingress"
-    task :authorize_security_group_ingress, [:port, :cidr_ip, :region] => [:env] do |t, args|
+    task :authorize_security_group_ingress, [:port, :cidr_ip, :region] => [:region] do |t, args|
       ec2 = Aws::EC2.new
       args.with_defaults(
         port: 8787,
         cidr_ip: '0.0.0.0/0'
       )
-      
+
       resp = ec2.authorize_security_group_ingress(
         group_name: "rstudio",
         group_id: read_data_file('security_group')[0],
@@ -50,29 +50,29 @@ namespace :aws do
         to_port: args.port,
         cidr_ip: args.cidr_ip,
         )
-        
+
     end
-      
+
     desc "create_image"
-    task :create_image, [:instance_id, :region] => [:env] do |t, args|
+    task :create_image, [:name, :instance_id, :region] => [:region] do |t, args|
       ec2 = Aws::EC2.new
       resp = ec2.create_image(
         dry_run: false,
         instance_id: args.instance_id,
-        name: "RStudio#{Time.now.utc.strftime("%Y-%m-%d.%H%M%S")}",
-        description: "Rstudio",
+        name: "#{args.name}-#{Time.now.utc.strftime("%Y-%m-%d.%H%M%S")}",
+        description: args.name,
         )
-      File.open(data_path('amis'), "w") { |f|
+      #File.open(data_path('amis'), "w") { |f|
         resp[:instances].each { |i|
-          f.write("#{resp}\n")
+      #    f.write("#{resp}\n")
           puts "Created #{resp}"
           puts "Note: the output may not be valid. See the EC2 console to find the Rstudio AMI if it appears empty."
         }
-      }
+      #}
     end
-      
+
     desc "describe_images"
-    task :describe_images, [:region] => [:env] do |t, args|
+    task :describe_images, [:region] => [:region] do |t, args|
       ec2 = Aws::EC2.new
       resp = ec2.describe_images(
         owners: [ENV['AWS_ACCOUNT_ID']],
@@ -84,9 +84,9 @@ namespace :aws do
         puts "\n"
       }
     end
-  
+
     desc "run_instance"
-    task :run_instance, [:image_id, :instance_type, :how_many, :region] => [:env] do |t, args|
+    task :run_instance, [:image_id, :instance_type, :how_many, :region] => [:region] do |t, args|
       args.with_defaults(
         instance_type: 'm1.small',
         how_many: 1,
@@ -101,40 +101,40 @@ namespace :aws do
         security_groups: ['rstudio'], # FIXME this is ignored in the run process ...
           # see http://docs.aws.amazon.com/sdkforruby/api/Aws/EC2/V20131015.html#run_instances-instance_method
       )
-      File.open(data_path('instances'), "w") { |f|
-        resp[:instances].each { |i|
-          f.write("#{i[:instance_id]}\n")
-          puts "Instance is starting: #{i[:instance_id]}"
-        }
+      resp[:instances].each { |i|
+        puts "Instance is starting: #{i[:instance_id]}"
       }
     end
-    
+
     desc "describe_instances"
-    task :describe_instances, [:region] => [:env] do |t, args|
+    task :describe_instances, [:region] => [:region] do |t, args|
       instance_ids = args.extras
       ec2 = Aws::EC2.new
-      
+
       resp = ec2.describe_instances(
         instance_ids: instance_ids,
       )
-      col = "%-18s"
-      printf(col * 5 + "\n", :INSTANCE_TYPE, :INSTANCE_ID, :IMAGE_ID, :STATE_NAME, :PUBLIC_IP_ADDRESS)
+      col = "%-24s"
+      headers = [:INSTANCE_TYPE, :INSTANCE_ID, :IMAGE_ID, :NAME, :LAUNCHED, :STATE, :PUBLIC_IP_ADDRESS]
+      printf(col * headers.size + "\n", *headers)
       resp[:reservations].each { |r|
         r[:instances].each { |i|
           next if i[:state][:name] == 'terminated'
-          printf(col * 5 + "\n", i[:instance_type], i[:instance_id], i[:image_id], i[:state][:name], i[:public_ip_address])
+          name = i[:tags].select { |e| e[0] == 'Name' }[0].value
+          # FIXME use printf_describe(rec, column_width, *keys)
+          printf(col * headers.size + "\n", i[:instance_type], i[:instance_id], i[:image_id], name, i[:launch_time], i[:state][:name], i[:public_ip_address])
           ip = i[:public_ip_address]
           puts "ssh -i #{ENV['AWS_SSH_KEY_PATH']} -l ubuntu #{ip}\n"
           puts "\n"
         }
       }
     end
-    
+
     desc "terminate_instance"
-    task :terminate_instance, [:instance_id, :region] => [:env] do |t, args|
+    task :terminate_instance, [:instance_id, :region] => [:region] do |t, args|
       instance_ids = [args.instance_id] + args.extras
       ec2 = Aws::EC2.new
-      
+
       resp = ec2.terminate_instances(
         instance_ids: instance_ids,
       )
