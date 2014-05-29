@@ -1,7 +1,8 @@
 # Aws::Sdk::Core::Ruby::Rake
 
-Convenient Rake wrapper on a growing set of AWS API methods. [See](http://docs.aws.amazon.com/sdkforruby/api/frames.html)
-for api details. Built upon the [aws-sdk-core-ruby](https://github.com/aws/aws-sdk-core-ruby)
+Convenient Rake wrapper on a growing set of AWS API methods.
+See [the AWS API](http://docs.aws.amazon.com/sdkforruby/api/frames.html) for implementation details.
+Built upon the [aws-sdk-core-ruby](https://github.com/aws/aws-sdk-core-ruby)
 
 ## Installation
 
