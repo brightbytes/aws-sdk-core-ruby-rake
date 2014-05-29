@@ -1,4 +1,4 @@
-Copyright (c) 2014 Michael Mell
+Copyright (c) 2014 BrightBytes
 
 MIT License
 
