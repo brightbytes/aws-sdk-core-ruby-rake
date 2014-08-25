@@ -58,10 +58,19 @@ namespace :aws do
         name: "#{args.name}-#{Time.now.utc.strftime("%Y-%m-%d.%H%M%S")}",
         description: args.name,
       )
-      resp[:instances].each { |i|
-        puts "Created #{resp}"
-        puts "Note: the output may not be valid. See the EC2 console to find the Rstudio AMI if it appears empty."
-      }
+      puts "Created new image #{resp[:image_id]}"
+    end
+    
+    desc "copy_image"
+    task :copy_image, [:name, :source_image_id, :source_region, :region] => [:region] do |t, args|
+      ec2 = Aws::EC2.new
+      resp = ec2.copy_image(
+        source_image_id: args.source_image_id,
+        source_region: args.source_region,
+        name: "#{args.name}-#{Time.now.utc.strftime("%Y-%m-%d.%H%M%S")}",
+        description: args.name,
+      )
+      puts "Copied image #{resp[:image_id]} in region #{args.region}"
     end
 
     desc "describe_images"
@@ -76,6 +85,25 @@ namespace :aws do
         printf(col * 4 + "\n", i[:image_id], i[:state], i[:public], i[:name])
         puts "\n"
       }
+    end
+    
+    desc "create_snapshot"
+    task :create_snapshot, [:volume_id, :description, :region] => [:region] do |t, args|
+      ec2 = Aws::EC2.new
+      resp = ec2.create_snapshot(
+        volume_id: args.volume_id,
+        description: "#{args.description}-#{Time.now.utc.strftime("%Y-%m-%d.%H%M%S")}",
+      )
+      puts "Created snapshot #{resp[:snapshot_id]} of volume #{args.volume_id}"
+    end
+    
+    desc "delete_snapshot"
+    task :delete_snapshot, [:snapshot_id, :region] => [:region] do |t, args|
+      ec2 = Aws::EC2.new
+      resp = ec2.delete_snapshot(
+        snapshot_id: args.snapshot_id,
+      )
+      puts "Deleted snapshot #{args.snapshot_id}"
     end
 
     desc "run_instances"
