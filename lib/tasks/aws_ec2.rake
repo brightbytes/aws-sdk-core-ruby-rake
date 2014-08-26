@@ -1,4 +1,5 @@
 require 'aws-sdk-core'
+require 'pry'
 
 namespace :aws do
 
@@ -83,6 +84,33 @@ namespace :aws do
       printf(col * 4 + "\n", :IMAGE_ID, :STATE, :PUBLIC, :NAME)
       resp[:images].each { |i|
         printf(col * 4 + "\n", i[:image_id], i[:state], i[:public], i[:name])
+        puts "\n"
+      }
+    end
+    
+    desc "describe_volumes"
+    task :describe_volumes, [:status, :encrypted, :size, :region] => [:region] do |t, args|
+      ec2 = Aws::EC2.new
+      resp = ec2.describe_volumes(
+        filters:[
+          {
+            name: 'status',
+            values: [args.status],
+          },
+          {
+            name: 'size',
+            values: [args.size],
+          },
+          {
+            name: 'encrypted',
+            values: [args.encrypted],
+          },
+        ],
+      )
+      col = "%-18s"
+      printf(col * 4 + "\n", :VOLUME_ID, :STATE, :SIZE, :ENCRYPTED)
+      resp[:volumes].each { |i|
+        printf(col * 4 + "\n", i[:volume_id], i[:state], i[:size], i[:encrypted])
         puts "\n"
       }
     end
