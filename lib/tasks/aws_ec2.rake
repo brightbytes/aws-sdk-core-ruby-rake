@@ -6,7 +6,7 @@ namespace :aws do
 
     desc "create_security_group"
     task :create_security_group, [:group_name, :region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.create_security_group(
         group_name: args.group_name,
         description: args.group_name,
@@ -15,7 +15,7 @@ namespace :aws do
 
     desc "describe_security_groups"
     task :describe_security_groups, [:region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.describe_security_groups()
       col = "%-18s"
       printf(col * 3 + "\n", :NAME, :ID, :DESCRIPTION)
@@ -31,7 +31,7 @@ namespace :aws do
 
     desc "authorize_security_group_ingress"
     task :authorize_security_group_ingress, [:group_name, :port, :cidr_ip, :region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       args.with_defaults(
         group_name: 'default',
         port: 80,
@@ -52,7 +52,7 @@ namespace :aws do
 
     desc "create_image"
     task :create_image, [:name, :instance_id, :region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.create_image(
         instance_id: args.instance_id,
         name: "#{args.name}-#{Time.now.utc.strftime("%Y-%m-%d.%H%M%S")}",
@@ -63,7 +63,7 @@ namespace :aws do
     
     desc "copy_image"
     task :copy_image, [:name, :source_image_id, :source_region, :region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.copy_image(
         source_image_id: args.source_image_id,
         source_region: args.source_region,
@@ -75,7 +75,7 @@ namespace :aws do
 
     desc "describe_images"
     task :describe_images, [:region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.describe_images(
         owners: [ENV['AWS_ACCOUNT_ID']],
       )
@@ -89,7 +89,7 @@ namespace :aws do
     
     desc "describe_volumes"
     task :describe_volumes, [:status, :encrypted, :size, :region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.describe_volumes(
         filters:[
           {
@@ -113,25 +113,6 @@ namespace :aws do
         puts "\n"
       }
     end
-    
-    desc "create_snapshot"
-    task :create_snapshot, [:volume_id, :description, :region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
-      resp = ec2.create_snapshot(
-        volume_id: args.volume_id,
-        description: "#{args.description}-#{Time.now.utc.strftime("%Y-%m-%d.%H%M%S")}",
-      )
-      puts "Created snapshot #{resp[:snapshot_id]} of volume #{args.volume_id}"
-    end
-    
-    desc "delete_snapshot"
-    task :delete_snapshot, [:snapshot_id, :region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
-      resp = ec2.delete_snapshot(
-        snapshot_id: args.snapshot_id,
-      )
-      puts "Deleted snapshot #{args.snapshot_id}"
-    end
 
     desc "run_instances"
     task :run_instances, [:image_id, :instance_type, :security_groups, :how_many, :region] => [:region] do |t, args|
@@ -152,7 +133,7 @@ namespace :aws do
       )
       security_groups = args.security_groups.split('&')
       how_many = args.how_many.split('*')
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.run_instances(
         image_id: args.image_id,
         instance_type: args.instance_type,
@@ -168,7 +149,7 @@ namespace :aws do
     desc "describe_instances"
     task :describe_instances, [:region] => [:region] do |t, args|
       instance_ids = args.extras
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
 
       resp = ec2.describe_instances(
         instance_ids: instance_ids,
@@ -197,7 +178,7 @@ namespace :aws do
     desc "terminate_instance"
     task :terminate_instance, [:instance_id, :region] => [:region] do |t, args|
       instance_ids = [args.instance_id] + args.extras
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.terminate_instances(
         instance_ids: instance_ids,
       )
