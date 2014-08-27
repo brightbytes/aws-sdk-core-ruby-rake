@@ -37,6 +37,9 @@ namespace :aws do
         f.write('# organization definitions')
         input = ask("Your AWS Region ")
         f.write("export AWS_REGION='#{input.strip}'\n")
+
+        input = ask("Your AWS Zone ")
+        f.write("export AWS_ZONE='#{input.strip}'\n")
       }
       puts "Successfully wrote the AWS credentials."
       puts "Now add `source #{path}` to your shell rc."
@@ -49,6 +52,7 @@ namespace :aws do
   task :region, [:region] do |t, args|
     args.with_defaults(
       region: ENV['AWS_REGION'],
+#      zone: ENV['AWS_ZONE'], # args are not passed to dependent tasks
     )
     Aws.config[:region] = args.region
     puts "\nIn region: #{args.region} ...\n\n"
