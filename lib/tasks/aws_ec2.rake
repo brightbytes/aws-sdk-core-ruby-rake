@@ -6,7 +6,7 @@ namespace :aws do
 
     desc "create_security_group"
     task :create_security_group, [:group_name, :region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.create_security_group(
         group_name: args.group_name,
         description: args.group_name,
@@ -15,7 +15,7 @@ namespace :aws do
 
     desc "describe_security_groups"
     task :describe_security_groups, [:region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.describe_security_groups()
       col = "%-18s"
       printf(col * 3 + "\n", :NAME, :ID, :DESCRIPTION)
@@ -31,7 +31,7 @@ namespace :aws do
 
     desc "authorize_security_group_ingress"
     task :authorize_security_group_ingress, [:group_name, :port, :cidr_ip, :region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       args.with_defaults(
         group_name: 'default',
         port: 80,
@@ -52,21 +52,30 @@ namespace :aws do
 
     desc "create_image"
     task :create_image, [:name, :instance_id, :region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.create_image(
         instance_id: args.instance_id,
         name: "#{args.name}-#{Time.now.utc.strftime("%Y-%m-%d.%H%M%S")}",
         description: args.name,
       )
-      resp[:instances].each { |i|
-        puts "Created #{resp}"
-        puts "Note: the output may not be valid. See the EC2 console to find the Rstudio AMI if it appears empty."
-      }
+      puts "Created new image #{resp[:image_id]}"
+    end
+    
+    desc "copy_image"
+    task :copy_image, [:name, :source_image_id, :source_region, :region] => [:region] do |t, args|
+      ec2 = Aws::EC2::Client.new
+      resp = ec2.copy_image(
+        source_image_id: args.source_image_id,
+        source_region: args.source_region,
+        name: "#{args.name}-#{Time.now.utc.strftime("%Y-%m-%d.%H%M%S")}",
+        description: args.name,
+      )
+      puts "Copied image #{resp[:image_id]} in region #{args.region}"
     end
 
     desc "describe_images"
     task :describe_images, [:region] => [:region] do |t, args|
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.describe_images(
         owners: [ENV['AWS_ACCOUNT_ID']],
       )
@@ -74,6 +83,33 @@ namespace :aws do
       printf(col * 4 + "\n", :IMAGE_ID, :STATE, :PUBLIC, :NAME)
       resp[:images].each { |i|
         printf(col * 4 + "\n", i[:image_id], i[:state], i[:public], i[:name])
+        puts "\n"
+      }
+    end
+    
+    desc "describe_volumes"
+    task :describe_volumes, [:status, :encrypted, :size, :region] => [:region] do |t, args|
+      ec2 = Aws::EC2::Client.new
+      resp = ec2.describe_volumes(
+        filters:[
+          {
+            name: 'status',
+            values: [args.status],
+          },
+          {
+            name: 'size',
+            values: [args.size],
+          },
+          {
+            name: 'encrypted',
+            values: [args.encrypted],
+          },
+        ],
+      )
+      col = "%-18s"
+      printf(col * 4 + "\n", :VOLUME_ID, :STATE, :SIZE, :ENCRYPTED)
+      resp[:volumes].each { |i|
+        printf(col * 4 + "\n", i[:volume_id], i[:state], i[:size], i[:encrypted])
         puts "\n"
       }
     end
@@ -97,7 +133,7 @@ namespace :aws do
       )
       security_groups = args.security_groups.split('&')
       how_many = args.how_many.split('*')
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.run_instances(
         image_id: args.image_id,
         instance_type: args.instance_type,
@@ -113,7 +149,7 @@ namespace :aws do
     desc "describe_instances"
     task :describe_instances, [:region] => [:region] do |t, args|
       instance_ids = args.extras
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
 
       resp = ec2.describe_instances(
         instance_ids: instance_ids,
@@ -142,7 +178,7 @@ namespace :aws do
     desc "terminate_instance"
     task :terminate_instance, [:instance_id, :region] => [:region] do |t, args|
       instance_ids = [args.instance_id] + args.extras
-      ec2 = Aws::EC2.new
+      ec2 = Aws::EC2::Client.new
       resp = ec2.terminate_instances(
         instance_ids: instance_ids,
       )
