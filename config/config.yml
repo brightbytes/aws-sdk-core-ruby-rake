@@ -1,0 +1,18 @@
+  # region
+  region: us-west-2 
+
+  # comma separated image ids for creating snapshots
+  image_ids: ami-9b6125ab 
+  
+  # comma separated instance ids for creating snapshots
+  instance_ids: i-3e045135
+  
+  # Days to retain snapshots 
+  # comment this if retention_period_week is uncommented
+  retention_period_days: 2
+  
+  #Week to retain snapshots 
+  # comment this if retention_period_days is uncommented
+  retention_period_week: 4
+
+  
