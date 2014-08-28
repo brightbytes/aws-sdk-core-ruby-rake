@@ -2,9 +2,11 @@
   region: us-west-2 
 
   # comma separated image ids for creating snapshots
+  # comment if do not want to use this filter
   image_ids: ami-9b6125ab 
   
   # comma separated instance ids for creating snapshots
+  # comment if do not want to use this filter
   instance_ids: i-3e045135
   
   # Days to retain snapshots 
