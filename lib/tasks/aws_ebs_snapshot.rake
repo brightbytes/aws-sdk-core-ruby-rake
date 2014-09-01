@@ -1,204 +1,153 @@
 require 'aws-sdk-core'
 
+ROOT_DEVICE = '/dev/sda1'
+
 namespace :aws do
 
   namespace :ebs do
   
     namespace :snapshot do
 
-      #captures snapshot for given volume id
-      desc "create_snapshot"
-      task :create_snapshot, [:volume_id, :description, :region] => [:region] do |t, args|
+      # Create snapshot of given volume id.
+      desc "create"
+      task :create, [:volume_id, :description, :region] => [:region] do |t, args|
         create_snapshot(args.volume_id, args.description, args.region)
       end
     
-      #deletes  snapshot 
-      desc "delete_snapshot"
-      task :delete_snapshot, [:snapshot_id, :region] => [:region] do |t, args|
-        delete_snapshot(args.snapshot_id, args.region)
+      # Create snapshot of the volumes attached to the instance id's.  
+      # instance_id - one or more comma separated instance id's. 
+      desc "create_from_instances"
+      task :create_from_instances, [:region, :instance_id] => [:region] do |t, args|
+        instance_list = args.extras
+        instance_list.push(args.instance_id)
+        instance_list.each { |instance|
+          # List all volumes attached to the instance.
+          volume_list = volumes_from_instance(instance, args.region)
+          capture_snapshots(volume_list, args.region)
+        }
+      end
+
+      # Create snapshots of the volumes attached to the instances launched using the image id specified. 
+      # image_id - one or more comma separated image id's.
+      desc "create_from_images"
+      task :create_from_images, [:region, :image_id] => [:region] do |t, args|
+        image_list = args.extras
+        image_list.push(args.image_id)
+
+        image_list.each { |image_id|
+          # List all instances created using the image id.
+          instance_list = instances_from_ami(image_id, args.region)
+          instance_list.each { |instance|
+            # List all volumes attached to the instance.
+            volume_list = volumes_from_instance(instance, args.region)
+            capture_snapshots(volume_list,  args.region)
+          }
+        }
       end
     
-      # create_snapshots - creates snaspshots for the multiple volumes in given region with some filters
-      # status - The status of the volume (creating | available | in-use | deleting | deleted | error)
-      # encrypted - The encryption status of the volume true | false 
-      # size - The size of the volume, in GiB      
-      # region - region to create snapshot
-      # this task filters out volumes with above parameters and captures snapshots of all
-      desc "create_snapshots"
-      task :create_snapshots, [:status, :encrypted, :size, :region] => [:region] do |t, args|
-          volumeList = describe_volumes(args.status, args.encrypted, args.size, args.region)
-          capture_snapshots(volumeList,  args.region)
+      # Delete snapshot by id.
+      desc "delete"
+      task :delete, [:snapshot_id, :region] => [:region] do |t, args|
+        delete_snapshot(args.snapshot_id, args.region)
       end
 
-      # create_snapshots - creates snaspshots for the volumes attached to instances  
-      # instanceId - List of instances to create snapshot
-      desc "create_snapshots_from_instances"
-      task :create_snapshots_from_instances, [:region, :instanceId] => [:region] do |t, args|
-        instanceList = args.extras
-        instanceList.push(args.instanceId)
+      # Delete snapshot by image id. 
+      # image_id - one or more comma separated image id's.
+      desc "delete_from_images"
+      task :delete_from_images, [:region, :retention_age_in_days, :image_id] => [:region] do |t, args|
+        image_list = args.extras
+        image_list.push(args.image_id)
 
-        instanceList.each { |instance|
-          volumeList = describe_instance_volumes(instance, args.region)
-          capture_snapshots(volumeList, args.region)
-        }
-      end
-
-      # create_snapshots - creates snaspshots for the volumes attached to instances created using image id 
-      # imageId-  imageId to create snapshot
-      desc "create_snapshots_from_images"
-      task :create_snapshots_from_images, [:region, :imageId] => [:region] do |t, args|
-        imageList = args.extras
-        imageList.push(args.imageId)
-
-        imageList.each { |imageId|
-          instanceList = describe_instances(imageId, args.region)
-          #capture snapshot for each instance volumes
-          instanceList.each { |instance|
-            volumeList = describe_instance_volumes(instance, args.region)
-            capture_snapshots(volumeList,  args.region)
+        image_list.each { |image|
+          # List all instances matches the image id.
+          instance_list = instances_from_ami(image, args.region)
+          instance_list.each { |instance|
+            # List all volumes attached to the instance.
+            volume_list = volumes_from_instance(instance, args.region)
+            # Delete snapshots older than retention period.
+            delete_snapshots_for_volumes(volume_list, args.retention_age_in_days,  args.region)
           }
         }
       end
       
-      # delete_snapshots_from_images - deletes snaspshots for the volumes attached to instances created using image id 
-      # imageId-  imageId to create snapshot
-      desc "delete_snapshots_from_images"
-      task :delete_snapshots_from_images, [:region, :retention_days, :imageId] => [:region] do |t, args|
-        imageList = args.extras
-        imageList.push(args.imageId)
-
-        imageList.each { |image|
-          instanceList = describe_instances(image, args.region)
-          #capture snapshot for each instance volumes
-          instanceList.each { |instance|
-            volumeList = describe_instance_volumes(instance, args.region)
-            #delete old snapshot or snapshot greater than restention days for each volumes
-            delete_snapshots_for_volumes(volumeList, args.retention_days,  args.region)
-          }
-        }
-      end
-      
-      # delete_snapshots_from_instances - deletes snaspshots for instances  
-      # instanceId - instanceid to delete snapshot
-      desc "delete_snapshots_from_instances"
-      task :delete_snapshots_from_instances, [:region, :retention_days, :instanceId] => [:region] do |t, args|
-            volumeList = describe_instance_volumes(args.instanceId, args.region)
-            #delete old snapshot or snapshot greater than restention days for each volumes
-            delete_snapshots_for_volumes(volumeList, args.retention_days,  args.region)
-      end
-      
-      # return list of volume from AWS
-      # status - The status of the volume (creating | available | in-use | deleting | deleted | error)
-      # encrypted - The encryption status of the volume true | false 
-      # size - The size of the volume, in GiB      
-      # region - region to create snapshot
-      def describe_volumes(status, encrypted, size, region)
-        ec2 = Aws::EC2::Client.new(region: region)
-        resp = ec2.describe_volumes(
-          filters:
-          [
-            {
-              name: 'status',
-              values: [status],
-            },
-            {
-              name: 'size',
-              values: [size],
-            },
-            {
-              name: 'encrypted',
-              values: [encrypted],
-            },
-          ],
-        )
-      
-        volumeList = []
-        col = "%-18s"
-        printf(col * 4 + "\n", :VOLUME_ID, :STATE, :SIZE, :ENCRYPTED)
-        resp[:volumes].each { |i|
-          volumeList.compact!
-          volumeList.push(i[:volume_id])
-          printf(col * 4 + "\n", i[:volume_id], i[:state], i[:size], i[:encrypted])
-          puts "\n"
-        }
-        volumeList
+      # Delete snapshots of the volumes attached to the instances launched using the image id specified.
+      # instance_id - one or more comma separated instance id's.
+      # retention_age_in_days - no of days to retain snapshot.
+      desc "delete_from_instances"
+      task :delete_from_instances, [:region, :retention_age_in_days, :instance_id] => [:region] do |t, args|
+            volume_list = volumes_from_instance(args.instance_id, args.region)
+            # delete snapshots older than retention period
+            delete_snapshots_for_volumes(volume_list, args.retention_age_in_days,  args.region)
       end
 
-      # return list of volume from AWS
-      # instanceid - The status of the volume (creating | available | in-use | deleting | deleted | error)
-      # region - AWS region for listing volumes
-      def describe_instance_volumes(instanceId, region)
+      # List volumes attached to the instance
+      def volumes_from_instance(instance_id, region)
         ec2 = Aws::EC2::Client.new(region: region)
         resp = ec2.describe_volumes(
           filters:
           [
             {
               name: 'attachment.instance-id',
-              values: [instanceId],
+              values: [instance_id],
             },
           ],
         )
 
-        volumeList = []
+        volume_list = []
         resp[:volumes].each { |i|
-          #we do not captures snapshot for root volumes which is generally less than 10 GB
-          next if i[:size] < 10
-          volumeList.compact!
-          volumeList.push(i[:volume_id])
+          # Skip root volumes attached to /dev/sda1
+          next if i[:attachments][0].device = ROOT_DEVICE
+          volume_list.compact!
+          volume_list.push(i[:volume_id])
           puts "Volume Id: #{i[:volume_id]}\n"
         }
-        volumeList
+        volume_list
       end
 
-      # return list of instances from AWS created using given image id
-      # imageId - image id for listing instances
-      # region - AWS region for listing instances
-      def describe_instances(imageId, region)
+      # List instances launched using the image id
+      def instances_from_ami(image_id, region)
         ec2 = Aws::EC2::Client.new(region: region)
         resp = ec2.describe_instances(
           filters:
           [
             {
               name: 'image-id',
-              values: [imageId],
+              values: [image_id],
             },
           ],
         )
         
-        instanceList = []
+        instance_list = []
         resp[:reservations].each { |r|
           r[:instances].each { |i|
-            next if i[:state][:name] == 'terminated'
-            instanceList.push(i[:instance_id])
+            next unless i[:state][:name] == 'running'
+            instance_list.push(i[:instance_id])
             puts "Instance Id :#{i[:instance_id]}\n"
           }
         }
-        instanceList
+        instance_list
       end
-       
-      #captures snapshots for given volume list
-      def capture_snapshots(volumeList, region)
 
-        volumeList.each { |volume|
-          name = "Automated_Snapshot_#{volume}"
+      # Capture snapshots
+      def capture_snapshots(volume_list, region)
+        volume_list.each { |volume|
+          name = "#{volume}"
           create_snapshot(volume, name, region)
         }
       end
       
-      #captures snapshots for given volume list
-      def delete_snapshots_for_volumes(volumeList, retention_days, region)
-
-        volumeList.each { |volume|
-          snapshotList = describe_snapshots(volume, retention_days, region)
-
-          snapshotList.each { |snapshot|
+      # Delete snapshots 
+      def delete_snapshots_for_volumes(volume_list, retention_age_in_days, region)
+        volume_list.each { |volume|
+          snapshot_list = snapshots_for_delete(volume, retention_age_in_days, region)
+          snapshot_list.each { |snapshot|
             delete_snapshot(snapshot, region)
           }
-
         }
       end
-       
-      def describe_snapshots(volumeId, retention_days, region)
+
+      # List snapshots to delete from specified volume id and retention period
+      def snapshots_for_delete(volumeId, retention_age_in_days, region)
         ec2 = Aws::EC2::Client.new(region: region)
         resp = ec2.describe_snapshots(
           filters:
@@ -210,22 +159,22 @@ namespace :aws do
           ],
         )
 
-        snapshotList = []
+        snapshot_list = []
         resp[:snapshots].each { |i|
-          #we do not captures snapshot for root volumes which is generally less than 10 GB
-           currentTime = Time.now
-           startTime = Time.at(i[:start_time])
-           days = (currentTime - startTime).to_i / (24 * 60 * 60)
-           puts "snapshot created Days :#{days} and Ret Days #{retention_days.to_i} \n"
-           next if retention_days.to_i != 0 && days <= retention_days.to_i
-           snapshotList.compact!
-           snapshotList.push(i[:snapshot_id])
-           puts "snapshot Id: #{i[:snapshot_id]}\n"
+          current_time = Time.now
+          snapshot_start_time = Time.at(i[:start_time])
+          current_age_in_days = (current_time - snapshot_start_time).to_i / (24 * 60 * 60)
+          puts "snapshot current age in days :#{current_age_in_days} and retention age days #{retention_age_in_days.to_i} \n"
+          # skip snapshot if retention age days is non zero and current age days is less thank retention age days 
+          next if retention_age_in_days.to_i != 0 && current_age_in_days <= retention_age_in_days.to_i
+          snapshot_list.compact!
+          snapshot_list.push(i[:snapshot_id])
+          puts "snapshot Id: #{i[:snapshot_id]}\n"
         }
-        snapshotList
+        snapshot_list
       end 
 
-      #creates snapshot for  given volume id and region
+      # Create snapshot of given volume id
       def create_snapshot(volume_id, description, region)
         ec2 = Aws::EC2::Client.new(region: region)
         resp = ec2.create_snapshot(
@@ -235,7 +184,7 @@ namespace :aws do
         puts "Created snapshot #{resp[:snapshot_id]} of volume #{volume_id}"
       end
 
-      #deletes snapshot for given snapshot_id
+      # Delete snapshot by id 
       def delete_snapshot(snapshot_id, region)
         ec2 = Aws::EC2::Client.new(region: region)
         resp = ec2.delete_snapshot(
