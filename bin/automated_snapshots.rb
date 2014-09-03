@@ -64,4 +64,3 @@
   run_delete_snapshot_from_instances
   run_delete_snapshot_from_images
   
-  
