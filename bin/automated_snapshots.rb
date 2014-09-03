@@ -7,7 +7,7 @@
   def run_create_snapshot_from_instances
     region = CONFIG['region'] != nil ? CONFIG['region'] : ENV['AWS_REGION']
     if CONFIG['instance_ids'] != nil
-      puts "==> about to create_from_instances run #{CONFIG['instance_ids']} #{} "
+      puts "==> about to run create_from_instances #{CONFIG['instance_ids']} #{region} "
       %x(rake aws:ebs:snapshot:create_from_instances[#{region},#{CONFIG['instance_ids']}]) 
     end
        
@@ -17,7 +17,7 @@
   def run_create_snapshot_from_images
     region = CONFIG['region'] != nil ? CONFIG['region'] : ENV['AWS_REGION']
     if CONFIG['image_ids'] != nil
-      puts "==> about to run create_from_images #{CONFIG['image_ids']} #{ENV['region']} "
+      puts "==> about to run create_from_images #{CONFIG['image_ids']} #{region}  "
       %x(rake aws:ebs:snapshot:create_from_images[#{region},#{CONFIG['image_ids']}])   
     end
   end
