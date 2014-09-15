@@ -5,7 +5,7 @@ ROOT_DEVICE = '/dev/sda1'
 namespace :aws do
 
   namespace :ebs do
-  
+
     namespace :snapshot do
 
       # Create snapshot of given volume id.
@@ -13,9 +13,9 @@ namespace :aws do
       task :create, [:volume_id, :description, :region] => [:region] do |t, args|
         create_snapshot(args.volume_id, args.description, args.region)
       end
-    
-      # Create snapshot of the volumes attached to the instance id's.  
-      # instance_id - one or more comma separated instance id's. 
+
+      # Create snapshot of the volumes attached to the instance id's.
+      # instance_id - one or more comma separated instance id's.
       desc "create_from_instances"
       task :create_from_instances, [:region, :instance_id] => [:region] do |t, args|
         instance_ids = args.extras
@@ -27,7 +27,7 @@ namespace :aws do
         }
       end
 
-      # Create snapshots of the volumes attached to the instances launched using the image id specified. 
+      # Create snapshots of the volumes attached to the instances launched using the image id specified.
       # image_id - one or more comma separated image id's.
       desc "create_from_images"
       task :create_from_images, [:region, :image_id] => [:region] do |t, args|
@@ -44,14 +44,14 @@ namespace :aws do
           }
         }
       end
-    
+
       # Delete snapshot by id.
       desc "delete"
       task :delete, [:snapshot_id, :region] => [:region] do |t, args|
         delete_snapshot(args.snapshot_id, args.region)
       end
 
-      # Delete snapshot by image id. 
+      # Delete snapshot by image id.
       # image_id - one or more comma separated image id's.
       desc "delete_from_images"
       task :delete_from_images, [:region, :retention_age_in_days, :image_id] => [:region] do |t, args|
@@ -69,7 +69,7 @@ namespace :aws do
           }
         }
       end
-      
+
       # Delete snapshots of the volumes attached to the instances launched using the image id specified.
       # instance_id - one or more comma separated instance id's.
       # retention_age_in_days - no of days to retain snapshot.
@@ -96,7 +96,7 @@ namespace :aws do
         volume_ids = []
         resp[:volumes].each { |i|
           # Skip root volumes attached to /dev/sda1
-          next if i[:attachments][0].device = ROOT_DEVICE
+          next if i[:attachments][0].device == ROOT_DEVICE
           volume_ids.compact!
           volume_ids.push(i[:volume_id])
           puts "Volume Id: #{i[:volume_id]}\n"
@@ -116,7 +116,7 @@ namespace :aws do
             },
           ],
         )
-        
+
         instance_ids = []
         resp[:reservations].each { |r|
           r[:instances].each { |i|
@@ -135,8 +135,8 @@ namespace :aws do
           create_snapshot(volume, name, region)
         }
       end
-      
-      # Delete snapshots. 
+
+      # Delete snapshots.
       def delete_snapshots_for_volumes(volume_ids, retention_age_in_days, region)
         volume_ids.each { |volume|
           snapshot_ids = snapshots_for_delete(volume, retention_age_in_days, region)
@@ -165,14 +165,14 @@ namespace :aws do
           snapshot_start_time = Time.at(i[:start_time])
           current_age_in_days = (current_time - snapshot_start_time).to_i / (24 * 60 * 60)
           puts "snapshot current age in days :#{current_age_in_days} and retention age days #{retention_age_in_days.to_i} \n"
-          # skip snapshot if retention age days is non zero and current age days is less thank retention age days 
+          # skip snapshot if retention age days is non zero and current age days is less thank retention age days
           next if retention_age_in_days.to_i != 0 && current_age_in_days <= retention_age_in_days.to_i
           snapshot_ids.compact!
           snapshot_ids.push(i[:snapshot_id])
           puts "snapshot Id: #{i[:snapshot_id]}\n"
         }
         snapshot_ids
-      end 
+      end
 
       # Create snapshot of given volume id.
       def create_snapshot(volume_id, description, region)
@@ -184,7 +184,7 @@ namespace :aws do
         puts "Created snapshot #{resp[:snapshot_id]} of volume #{volume_id}"
       end
 
-      # Delete snapshot by id. 
+      # Delete snapshot by id.
       def delete_snapshot(snapshot_id, region)
         ec2 = Aws::EC2::Client.new(region: region)
         resp = ec2.delete_snapshot(
@@ -193,8 +193,8 @@ namespace :aws do
         puts "Deleted snapshot #{snapshot_id}"
       end
 
-    end 
-   
+    end
+
   end
 
 end
