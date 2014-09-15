@@ -29,6 +29,18 @@ namespace :aws do
       }
     end
 
+    desc "describe_addresses"
+    task :describe_addresses, [:region] => [:region] do |t, args|
+      ec2 = Aws::EC2.new
+      resp = ec2.describe_addresses()
+      col = "%-18s"
+      printf(col * 3 + "\n", :INSTANCE, :IP, :ALLOCATION, :ASSOCIATION, :DOMAIN)
+      resp[:addresses].each { |i|
+        printf(col * 3 + "\n", i[:instance_id], i[:public_ip], i[:allocation_id], i[:association_id], i[:domain] )
+        puts "\n"
+      }
+    end
+
     desc "authorize_security_group_ingress"
     task :authorize_security_group_ingress, [:group_name, :port, :cidr_ip, :region] => [:region] do |t, args|
       ec2 = Aws::EC2::Client.new
@@ -60,7 +72,7 @@ namespace :aws do
       )
       puts "Created new image #{resp[:image_id]}"
     end
-    
+
     desc "copy_image"
     task :copy_image, [:name, :source_image_id, :source_region, :region] => [:region] do |t, args|
       ec2 = Aws::EC2::Client.new
@@ -86,7 +98,7 @@ namespace :aws do
         puts "\n"
       }
     end
-    
+
     desc "describe_volumes"
     task :describe_volumes, [:status, :encrypted, :size, :region] => [:region] do |t, args|
       ec2 = Aws::EC2::Client.new
@@ -115,7 +127,7 @@ namespace :aws do
     end
 
     desc "run_instances"
-    task :run_instances, [:image_id, :instance_type, :security_groups, :how_many, :region] => [:region] do |t, args|
+    task :run_instances, [:image_id, :instance_type, :security_groups, :how_many, :region, :zone] => [:region] do |t, args|
       args.with_defaults(
         # instance_type: t1.micro|m1.small|m1.medium|m1.large|m1.xlarge
         # | m3.medium|m3.large|m3.xlarge|m3.2xlarge
@@ -140,6 +152,9 @@ namespace :aws do
         security_groups: security_groups,
         min_count: how_many.first.to_i,
         max_count: how_many.last.to_i,
+        placement: {
+          availability_zone: "#{Aws.config[:region]}#{ENV['AWS_ZONE']}", # args are not propagated from the :region pre-task
+        },
       )
       resp[:instances].each { |i|
         puts "Instance is starting: #{i[:instance_id]}"
@@ -154,8 +169,8 @@ namespace :aws do
       resp = ec2.describe_instances(
         instance_ids: instance_ids,
       )
-      col = "%-24s"
-      headers = [:INSTANCE_TYPE, :INSTANCE_ID, :GROUPS, :IMAGE_ID, :NAME, :LAUNCHED, :STATE, :PUBLIC_IP_ADDRESS]
+      col = "%-16s"
+      headers = [:INSTANCE_TYPE, :INSTANCE_ID, :GROUPS, :IMAGE_ID, :STATE, :PUBLIC_IP, :LAUNCHED, :NAME]
       printf(col * headers.size + "\n", *headers)
       resp[:reservations].each { |r|
         groups = r[:groups].map { |e| e[:group_name] }.join(',')
@@ -167,16 +182,17 @@ namespace :aws do
             name = nil
           end
           # FIXME use printf_describe(rec, column_width, *keys)
-          printf(col * headers.size + "\n", i[:instance_type], i[:instance_id], groups, i[:image_id], name, i[:launch_time], i[:state][:name], i[:public_ip_address])
+          data = [i[:instance_type], i[:instance_id], groups, i[:image_id], i[:state][:name], i[:public_ip_address], i[:launch_time], name].map { |e| "#{e}  " }
+          printf(col * headers.size + "\n", *data)
           ip = i[:public_ip_address]
-          puts "ssh -i #{ENV['AWS_SSH_KEY_PATH']} -l ubuntu #{ip}\n"
+#          puts "ssh -i #{ENV['AWS_SSH_KEY_PATH']} -l ubuntu #{ip}\n"
           puts "\n"
         }
       }
     end
 
-    desc "terminate_instance"
-    task :terminate_instance, [:instance_id, :region] => [:region] do |t, args|
+    desc "terminate_instances"
+    task :terminate_instances, [:instance_id, :region] => [:region] do |t, args|
       instance_ids = [args.instance_id] + args.extras
       ec2 = Aws::EC2::Client.new
       resp = ec2.terminate_instances(
