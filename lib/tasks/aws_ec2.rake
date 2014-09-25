@@ -165,10 +165,13 @@ namespace :aws do
     task :describe_instances, [:region] => [:region] do |t, args|
       instance_ids = args.extras
       ec2 = Aws::EC2::Client.new
-
-      resp = ec2.describe_instances(
-        instance_ids: instance_ids,
-      )
+      if !instance_ids.empty?
+        resp = ec2.describe_instances(
+          instance_ids: instance_ids
+        )
+      else
+        resp = ec2.describe_instances
+      end
       col = "%-16s"
       headers = [:INSTANCE_TYPE, :INSTANCE_ID, :GROUPS, :IMAGE_ID, :STATE, :PUBLIC_IP, :LAUNCHED, :NAME]
       printf(col * headers.size + "\n", *headers)
