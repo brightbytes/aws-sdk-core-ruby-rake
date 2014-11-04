@@ -27,6 +27,24 @@ namespace :aws do
         }
       end
 
+      # Create snapshots of the volumes attached to the instances of specified name.
+      # instance_name - one or more comma separated instance names.
+      desc "create_from_instance_name"
+      task :create_from_instance_name, [:region, :instance_name] => [:region] do |t, args|
+        instance_names = args.extras
+        instance_names.push(args.instance_name)
+
+        instance_names.each { |instance_name|
+          # List all instances created using the image id.
+          instance_ids = instances_from_name(instance_name, args.region)
+          instance_ids.each { |instance|
+            # List all volumes attached to the instance.
+            volume_ids = volumes_from_instance(instance, args.region)
+            capture_snapshots(volume_ids, args.region)
+          }
+        }
+      end
+
       # Create snapshots of the volumes attached to the instances launched using the image id specified.
       # image_id - one or more comma separated image id's.
       desc "create_from_images"
@@ -61,6 +79,25 @@ namespace :aws do
         image_ids.each { |image|
           # List all instances matches the image id.
           instance_ids = instances_from_ami(image, args.region)
+          instance_ids.each { |instance|
+            # List all volumes attached to the instance.
+            volume_ids = volumes_from_instance(instance, args.region)
+            # Delete snapshots older than retention period.
+            delete_snapshots_for_volumes(volume_ids, args.retention_age_in_days, args.region)
+          }
+        }
+      end
+
+      # Delete snapshot by image id.
+      # image_id - one or more comma separated image id's.
+      desc "delete_from_instance_name"
+      task :delete_from_instance_name, [:region, :retention_age_in_days, :instance_name] => [:region] do |t, args|
+        instance_names = args.extras
+        instance_names.push(args.instance_name)
+
+        instance_names.each { |instance_name|
+          # List all instances matches the image id.
+          instance_ids = instances_from_name(instance_name, args.region)
           instance_ids.each { |instance|
             # List all volumes attached to the instance.
             volume_ids = volumes_from_instance(instance, args.region)
@@ -114,6 +151,30 @@ namespace :aws do
               name: 'image-id',
               values: [image_id],
             },
+          ],
+        )
+
+        instance_ids = []
+        resp[:reservations].each { |r|
+          r[:instances].each { |i|
+            next unless i[:state][:name] == 'running'
+            instance_ids.push(i[:instance_id])
+            puts "Instance Id :#{i[:instance_id]}\n"
+          }
+        }
+        instance_ids
+      end
+
+      # List instances launched using the image id.
+      def instances_from_name(instance_name, region)
+        ec2 = Aws::EC2::Client.new(region: region)
+        resp = ec2.describe_instances(
+          filters:
+          [
+            {
+               name: 'tag-value',
+               values: [instance_name]
+            }
           ],
         )
 

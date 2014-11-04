@@ -1,2 +1,0 @@
-#!/usr/bin/env ruby
-LOG_FILE_PATH = '/var/log/cron_snapshots.log'
