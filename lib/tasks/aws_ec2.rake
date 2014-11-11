@@ -194,6 +194,31 @@ namespace :aws do
       }
     end
 
+    desc "start an instance"
+    task :start_instances, [:instance_id, :region] => [:region] do |t, args|
+      instance_ids = [args.instance_id] + args.extras
+      ec2 = Aws::EC2::Client.new
+      resp = ec2.start_instances(
+        instance_ids: instance_ids,
+      )
+      puts resp.inspect
+      resp[:starting_instances].each { |i|
+        puts "#{i[:instance_id]} #{i[:current_state][:name]}"
+      }
+    end
+
+    desc "stop an instance"
+    task :stop_instances, [:instance_id, :region] => [:region] do |t, args|
+      instance_ids = [args.instance_id] + args.extras
+      ec2 = Aws::EC2::Client.new
+      resp = ec2.stop_instances(
+        instance_ids: instance_ids,
+      )
+      resp[:stopping_instances].each { |i|
+        puts "#{i[:instance_id]} #{i[:current_state][:name]}"
+      }
+    end
+
     desc "terminate_instances"
     task :terminate_instances, [:instance_id, :region] => [:region] do |t, args|
       instance_ids = [args.instance_id] + args.extras
@@ -209,3 +234,4 @@ namespace :aws do
   end
 
 end
+
