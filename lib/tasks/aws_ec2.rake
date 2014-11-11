@@ -201,7 +201,6 @@ namespace :aws do
       resp = ec2.start_instances(
         instance_ids: instance_ids,
       )
-      puts resp.inspect
       resp[:starting_instances].each { |i|
         puts "#{i[:instance_id]} #{i[:current_state][:name]}"
       }
