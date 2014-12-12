@@ -187,8 +187,6 @@ namespace :aws do
           # FIXME use printf_describe(rec, column_width, *keys)
           data = [i[:instance_type], i[:instance_id], groups, i[:image_id], i[:state][:name], i[:public_ip_address], i[:launch_time], name].map { |e| "#{e}  " }
           printf(col * headers.size + "\n", *data)
-          ip = i[:public_ip_address]
-#          puts "ssh -i #{ENV['AWS_SSH_KEY_PATH']} -l ubuntu #{ip}\n"
           puts "\n"
         }
       }
