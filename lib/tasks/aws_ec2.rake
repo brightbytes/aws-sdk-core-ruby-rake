@@ -173,7 +173,7 @@ namespace :aws do
         resp = ec2.describe_instances
       end
       col = "%-16s"
-      headers = [:INSTANCE_TYPE, :INSTANCE_ID, :GROUPS, :IMAGE_ID, :STATE, :PUBLIC_IP, :LAUNCHED, :NAME]
+      headers = [:INSTANCE_TYPE, :INSTANCE_ID, :GROUPS, :IMAGE_ID, :STATE, :PUBLIC_IP, :PRIVATE_IP, :LAUNCHED, :NAME]
       printf(col * headers.size + "\n", *headers)
       resp[:reservations].each { |r|
         groups = r[:groups].map { |e| e[:group_name] }.join(',')
@@ -185,7 +185,7 @@ namespace :aws do
             name = nil
           end
           # FIXME use printf_describe(rec, column_width, *keys)
-          data = [i[:instance_type], i[:instance_id], groups, i[:image_id], i[:state][:name], i[:public_ip_address], i[:launch_time], name].map { |e| "#{e}  " }
+          data = [i[:instance_type], i[:instance_id], groups, i[:image_id], i[:state][:name], i[:public_ip_address], i[:private_ip_address], i[:launch_time], name].map { |e| "#{e}  " }
           printf(col * headers.size + "\n", *data)
           puts "\n"
         }
@@ -231,4 +231,3 @@ namespace :aws do
   end
 
 end
-
