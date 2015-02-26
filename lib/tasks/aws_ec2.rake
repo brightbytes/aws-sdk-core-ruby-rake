@@ -129,17 +129,7 @@ namespace :aws do
     desc "run_instances"
     task :run_instances, [:image_id, :instance_type, :security_groups, :how_many, :region, :zone] => [:region] do |t, args|
       args.with_defaults(
-        # instance_type: t1.micro|m1.small|m1.medium|m1.large|m1.xlarge
-        # | m3.medium|m3.large|m3.xlarge|m3.2xlarge
-        # | m2.xlarge|m2.2xlarge|m2.4xlarge
-        # | cr1.8xlarge|i2.xlarge|i2.2xlarge|i2.4xlarge|i2.8xlarge|
-        # | hi1.4xlarge|hs1.8xlarge
-        # | c1.medium|c1.xlarge
-        # | c3.large|c3.xlarge|c3.2xlarge|c3.4xlarge|c3.8xlarge|
-        # | cc1.4xlarge|cc2.8xlarge|g2.2xlarge|cg1.4xlarge
-        # | r3.large|r3.xlarge|r3.2xlarge|r3.4xlarge|r3.8xlarge
-
-        instance_type: 'm1.small',
+        instance_type: 't2.small',
         security_groups: 'default',
         how_many: '1', # '2,5'
       )
@@ -153,7 +143,7 @@ namespace :aws do
         min_count: how_many.first.to_i,
         max_count: how_many.last.to_i,
         placement: {
-          availability_zone: "#{Aws.config[:region]}#{ENV['AWS_ZONE']}", # args are not propagated from the :region pre-task
+          availability_zone: "#{args.region}#{args.zone}"
         },
       )
       resp[:instances].each { |i|
