@@ -148,6 +148,7 @@ namespace :aws do
       )
       resp[:instances].each { |i|
         puts "Instance is starting: #{i[:instance_id]}"
+        puts "NOTE: the aws ssh key can not be specified in this method and no authorized keys will be added."
       }
     end
 
